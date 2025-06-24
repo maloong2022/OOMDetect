@@ -170,3 +170,16 @@ Caused by: java.lang.OutOfMemoryError: PermGen space
 * -XX：MaxMetaspaceSize：设置元空间最大值，默认是-1，即不限制，或者说只受限于本地内存大小。
 * -XX：MetaspaceSize：指定元空间的初始空间大小，以字节为单位，<font color="#ff0000">达到该值就会触发垃圾收集进行类型卸载，同时收集器会对该值进行调整</font>：如果释放了大量的空间，就适当降低该值；如果释放了很少的空间，那么在不超过-XX：MaxMetaspaceSize（如果设置了的话）的情况下，适当提高该值。
 * -XX：MinMetaspaceFreeRatio：作用是在垃圾收集之后控制最小的元空间剩余容量的百分比，可减少因为元空间不足导致的垃圾收集的频率。类似的还有-XX：Max-MetaspaceFreeRatio，用于控制最大的元空间剩余容量的百分比。
+
+### 本机直接内存溢出
+直接内存(Direct Memory)的容量大小可通过-XX：MaxDirectMemorySize参数来指定，如果不去指定，则默认与Java堆最大值（由-Xmx指定）一致，代码下面代码越过了DirectByteBuffer类直接通过反射获取Unsafe实例进行内存分配（Unsafe类的getUnsafe()方法指定只有引导类加载器才会返回实例，体现了设计者希望只有虚拟机标准类库里面的类才能使用Unsafe的功能，在JDK 10时才将Unsafe的部分功能通过VarHandle开放给外部使用）​，因为虽然使用DirectByteBuffer分配内存也会抛出内存溢出异常，但它抛出异常时并没有真正向操作系统申请分配内存，而是通过计算得知内存无法分配就会在代码里手动抛出溢出异常，真正申请分配内存的方法是Unsafe::allocateMemory()
+
+代码【DirectMemoryOOM.java】
+
+运行结果
+```bash
+Exception in thread "main" java.lang.OutOfMemoryError
+	at sun.misc.Unsafe.allocateMemory(Native Method)
+	at DirectMemoryOOM.main(DirectMemoryOOM.java:13)
+```
+由直接内存导致的内存溢出，一个明显的特征是在Heap Dump文件中不会看见有什么明显的异常情况，如果读者发现内存溢出之后产生的Dump文件很小，而程序中又直接或间接使用了DirectMemory（典型的间接使用就是NIO）​，那就可以考虑重点检查一下直接内存方面的原因了。
