@@ -1,0 +1,7 @@
+### Idea IDE ###
+.idea/
+target/
+
+### Mac OS ###
+.DS_Store!/.idea/
+!/.mvn/
